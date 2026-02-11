@@ -1,0 +1,39 @@
+name: Set AWS Account Environments
+description: Returns AWS account ID for the hyderabad environment
+
+inputs:
+  environment:
+    description: "Environment to deploy (currently only 'hyderabad' is supported)"
+    required: false
+    default: hyderabad
+
+outputs:
+  matrix:
+    description: "JSON array of environment-account mappings"
+    value: ${{ steps.set-accounts.outputs.matrix }}
+  environment:
+    description: "Environment name"
+    value: ${{ steps.set-accounts.outputs.environment }}
+  account_id:
+    description: "AWS account ID for the environment"
+    value: ${{ steps.set-accounts.outputs.account_id }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: set-accounts
+      shell: bash
+      run: |
+        ENV="${{ inputs.environment }}"
+
+        if [ "${ENV}" != "hyderabad" ]; then
+          echo "Invalid environment: ${ENV}"
+          echo "Only 'hyderabad' is supported in this repository."
+          exit 1
+        fi
+
+        ACCOUNT_ID="111111111111"
+
+        echo "environment=${ENV}" >> $GITHUB_OUTPUT
+        echo "account_id=${ACCOUNT_ID}" >> $GITHUB_OUTPUT
+        echo "matrix=[{\"environment\":\"hyderabad\",\"account_id\":\"${ACCOUNT_ID}\"}]" >> $GITHUB_OUTPUT

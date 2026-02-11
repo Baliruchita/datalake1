@@ -1,0 +1,76 @@
+name: Terraform PR Plan for hyderabad Datalake
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  setup-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-accounts.outputs.matrix }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Returns hyderabad account only (intentionally single-environment)
+      - name: Set AWS Account Environment
+        id: set-accounts
+        uses: ./.github/actions/set-aws-account-environments
+
+  static-checks:
+    uses: compute-aws/terraform-cats-pub-lib-pipelines/.github/workflows/terraform-static-analysis.yml@v1.2.4
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+    with:
+      terraform-version: "1.5.7"
+      run_tf-docs: false
+    secrets:
+      compute_GITHUB_APP_ID: ${{ vars.compute_GITHUB_APP_ID }}
+      compute_GITHUB_APP_PRIVATE_KEY: ${{ secrets.compute_GITHUB_APP_PRIVATE_KEY }}
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  validate-datalake:
+    needs: [setup-matrix, static-checks]
+    if: ${{ always() && (needs.static-checks.result == 'success' || needs.static-checks.result == 'skipped') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    uses: compute-aws/terraform-cats-pub-lib-pipelines/.github/workflows/terraform_validate_workspaces.yml@v1.2.4
+    with:
+      tf_version: ${{ vars.TF_VERSION }}
+      aws_region: ${{ vars.AWS_REGION }}
+      environment: ${{ matrix.environment }}
+      event_name: pull_request
+      role_to_assume: "arn:aws:iam::${{ matrix.account_id }}:role/compute-service-role/github-oidc-role"
+      working_directory: "datalake"
+    secrets: inherit
+
+  plan-datalake:
+    needs: [setup-matrix, validate-datalake]
+    if: ${{ always() && needs.validate-datalake.result == 'success' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.setup-matrix.outputs.matrix) }}
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    uses: compute-aws/terraform-cats-pub-lib-pipelines/.github/workflows/terraform_plan_workspaces.yml@v1.2.4
+    with:
+      tf_version: ${{ vars.TF_VERSION }}
+      aws_region: ${{ vars.AWS_REGION }}
+      environment: ${{ matrix.environment }}
+      event_name: pull_request
+      role_to_assume: "arn:aws:iam::${{ matrix.account_id }}:role/compute-service-role/github-oidc-role"
+      tfplan_s3_bucket: ${{ vars.TFPLAN_S3_BUCKET }}
+      working_directory: "datalake"
+    secrets: inherit

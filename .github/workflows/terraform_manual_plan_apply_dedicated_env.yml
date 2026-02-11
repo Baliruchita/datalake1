@@ -1,0 +1,79 @@
+name: Terraform plan/apply in hyderabad environment for Datalake
+run-name: Terraform ${{ github.event.inputs.action }} in hyderabad for Datalake
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment for Terraform action"
+        required: true
+        default: "hyderabad"
+        type: choice
+        options:
+          - hyderabad
+      action:
+        description: "Terraform action to perform"
+        required: true
+        default: "plan-apply"
+        type: choice
+        options:
+          - plan
+          - plan-apply
+
+jobs:
+  setup-environment:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-accounts.outputs.environment }}
+      account_id: ${{ steps.set-accounts.outputs.account_id }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set AWS Account Environments
+        id: set-accounts
+        uses: ./.github/actions/set-aws-account-environments
+        with:
+          environment: ${{ github.event.inputs.environment }}
+
+  plan-datalake:
+    needs: [setup-environment]
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    uses: compute-aws/terraform-cats-pub-lib-pipelines/.github/workflows/terraform_plan_workspaces.yml@v1.2.4
+    with:
+      tf_version: ${{ vars.TF_VERSION }}
+      aws_region: ${{ vars.AWS_REGION }}
+      environment: ${{ needs.setup-environment.outputs.environment }}
+      role_to_assume: "arn:aws:iam::${{ needs.setup-environment.outputs.account_id }}:role/compute-service-role/github-oidc-role"
+      tfplan_s3_bucket: ${{ vars.TFPLAN_S3_BUCKET }}
+      working_directory: "datalake"
+    secrets: inherit
+
+  manual-approval:
+    needs: [setup-environment, plan-datalake]
+    if: ${{ github.event.inputs.action == 'plan-apply' }}
+    environment: hyderabad
+    runs-on: ubuntu-latest
+    steps:
+      - name: Waiting for approval to apply the change in hyderabad
+        run: ""
+
+  apply-datalake:
+    needs: [setup-environment, manual-approval]
+    if: ${{ github.event.inputs.action == 'plan-apply' }}
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    uses: compute-aws/terraform-cats-pub-lib-pipelines/.github/workflows/terraform_apply_workspaces.yml@v1.2.4
+    with:
+      tf_version: ${{ vars.TF_VERSION }}
+      aws_region: ${{ vars.AWS_REGION }}
+      environment: ${{ needs.setup-environment.outputs.environment }}
+      role_to_assume: "arn:aws:iam::${{ needs.setup-environment.outputs.account_id }}:role/compute-service-role/github-oidc-role"
+      tfplan_s3_bucket: ${{ vars.TFPLAN_S3_BUCKET }}
+      working_directory: "datalake"
+    secrets: inherit
