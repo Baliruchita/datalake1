@@ -1,4 +1,4 @@
-name: Terraform Datalake via OIDC 
+name: Terraform Datalake via OIDC
 
 on:
   workflow_dispatch:
@@ -14,27 +14,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Configure AWS Credentials via OIDC
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: arn:aws:iam::483416847573:role/firstroleinoidc
-        aws-region: eu-west-1
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::483416847573:role/firstroleinoidc
+          aws-region: eu-west-1
 
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
 
-    - name: Terraform Init
-      run: terraform init
+      # Debugging – Lists directory structure
+      - name: List files (root)
+        run: ls -la
 
-    - name: Terraform Validate
-      run: terraform validate
+      - name: List files (environments)
+        run: ls -la ./environments
 
-    - name: Terraform Plan
-      run: terraform plan -input=false
+      # Terraform commands in the environments directory
+      - name: Terraform Init
+        working-directory: ./environments
+        run: terraform init
 
-    - name: Terraform Apply 
-      if: github.ref == 'refs/heads/main'
-      run: terraform apply -auto-approve -input=false
+      - name: Terraform Validate
+        working-directory: ./environments
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: ./environments
+        run: terraform plan -input=false
+
+      - name: Terraform Apply 
+        if: github.ref == 'refs/heads/main'
+        working-directory: ./environments
+        run: terraform apply -auto-approve -input=false
