@@ -19,7 +19,7 @@ jobs:
 
       - name: Configure AWS Credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
-        with:
+        with: 
           role-to-assume: arn:aws:iam::483416847573:role/firstroleinoidc
           aws-region: eu-west-1
 
