@@ -21,7 +21,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::483416847573:user/datalake
-          aws-region: us-east-1
+          aws-region: eu-west-1
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
